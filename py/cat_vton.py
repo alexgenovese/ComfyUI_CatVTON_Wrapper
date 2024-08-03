@@ -4,6 +4,10 @@ from comfy.model_management import get_torch_device
 NODE_NAME = 'CatVTON_Wrapper'
 MAX_RESOLUTION = 16384
 
+catvton_path = os.path.join(folder_paths.models_dir, "checkpoints", "CatVTON")
+sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
+sd_vae_path = os.path.join(catvton_path, "stabilityai/sd-vae-ft-mse")
+
 class LS_CatVTON:
 
     def __init__(self):
@@ -33,8 +37,7 @@ class LS_CatVTON:
 
     def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg, width, height):
 
-        catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
-        sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
+        self.check_weights()
 
         mixed_precision = {
             "fp32": torch.float32,
@@ -87,6 +90,47 @@ class LS_CatVTON:
         log(f"{NODE_NAME} Processed.", message_type='finish')
 
         return (result_image,)
+    
+    def check_weights(self): 
+        # for faster download
+        from huggingface_hub import snapshot_download
+        os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = 1
+
+        # setup the folder paths
+        if not os.path.exists(catvton_path): 
+            os.makedirs(catvton_path)
+            print(f"Downloading CatVTON...")
+            snapshot_download(
+                repo_id="zhengchong/CatVTON",
+                local_dir=catvton_path
+            )
+            print(f"Download Completed in {catvton_path}")
+
+
+        # check if exists SD1.5
+        if not os.path.exists(sd15_inpaint_path):
+            os.makedirs(sd15_inpaint_path)
+            print(f"Downloading SD15-Inpainting...")
+            snapshot_download(
+                repo_id="runwayml/stable-diffusion-inpainting",
+                local_dir=sd15_inpaint_path
+            )
+            print(f"Download Completed in {sd15_inpaint_path}")
+
+
+        # check SD Vae
+        if not os.path.exists(sd_vae_path):
+            os.makedirs(sd_vae_path)
+            print(f"Downloading SD-Vae...")
+            snapshot_download(
+                repo_id="stabilityai/sd-vae-ft-mse",
+                local_dir=sd_vae_path
+            )
+            print(f"Download Completed in {sd_vae_path}")
+
+
+
+
 
 NODE_CLASS_MAPPINGS = {
     "CatVTONWrapper": LS_CatVTON
