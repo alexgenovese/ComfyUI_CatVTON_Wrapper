@@ -2,6 +2,7 @@ from .func import *
 from comfy.model_management import get_torch_device
 
 NODE_NAME = 'CatVTON_Wrapper'
+MAX_RESOLUTION = 16384
 
 class LS_CatVTON:
 
@@ -20,6 +21,8 @@ class LS_CatVTON:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
                 "steps": ("INT", {"default": 40, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 14.0, "step": 0.1, "round": 0.01,},),
+                "width": ("INT", {"default": 768, "min": 0, "max": MAX_RESOLUTION}),
+                "height": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
             }
         }
 
@@ -28,13 +31,10 @@ class LS_CatVTON:
     FUNCTION = "catvton"
     CATEGORY = '😺dzNodes/CatVTON Wrapper'
 
-    def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg):
+    def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg, width, height):
 
         catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
         sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
-
-        # check if weights are in the folder 
-        self.check_weights_or_download()
 
         mixed_precision = {
             "fp32": torch.float32,
@@ -47,7 +47,7 @@ class LS_CatVTON:
             attn_ckpt=catvton_path,
             attn_ckpt_version="mix",
             weight_dtype=mixed_precision,
-            use_tf32= True if mixed_precision == 'fp32' else False,
+            use_tf32=False,
             device=get_torch_device()
         )
 
@@ -64,10 +64,10 @@ class LS_CatVTON:
         mask_image = mask_image[0]
         mask_image = to_pil_image(mask_image)
 
-        generator = torch.Generator(device=get_torch_device() ).manual_seed(seed)
-        person_image, person_image_bbox = resize_and_padding_image(target_image, (768, 1024))
-        cloth_image, _ = resize_and_padding_image(refer_image, (768, 1024))
-        mask, _ = resize_and_padding_image(mask_image, (768, 1024))
+        generator = torch.Generator(device=get_torch_device()).manual_seed(seed)
+        person_image, person_image_bbox = resize_and_padding_image(target_image, (width, height))
+        cloth_image, _ = resize_and_padding_image(refer_image, (width, height))
+        mask, _ = resize_and_padding_image(mask_image, (width, height))
         mask_processor = VaeImageProcessor(vae_scale_factor=8, do_normalize=False, do_binarize=True,
                                            do_convert_grayscale=True)
         mask = mask_processor.blur(mask, blur_factor=9)
@@ -87,12 +87,6 @@ class LS_CatVTON:
         log(f"{NODE_NAME} Processed.", message_type='finish')
 
         return (result_image,)
-    
-
-    def check_weights_or_download(self): 
-        catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
-        sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
-
 
 NODE_CLASS_MAPPINGS = {
     "CatVTONWrapper": LS_CatVTON
