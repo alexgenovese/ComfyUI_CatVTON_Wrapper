@@ -94,7 +94,7 @@ class LS_CatVTON:
     def check_weights(self): 
         # for faster download
         from huggingface_hub import snapshot_download
-        os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = 1
+        os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = "1"
 
         # setup the folder paths
         if not os.path.exists(catvton_path): 
