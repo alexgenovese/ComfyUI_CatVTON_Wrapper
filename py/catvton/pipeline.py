@@ -22,6 +22,7 @@ from .utils1 import (
     resize_and_crop,
     resize_and_padding,
 )
+from comfy.utils import ProgressBar
 
 
 class CatVTONPipeline:
@@ -151,6 +152,9 @@ class CatVTONPipeline:
         # Denoising loop
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
         num_warmup_steps = (len(timesteps) - num_inference_steps * self.noise_scheduler.order)
+        
+        self.pbar = ProgressBar(num_inference_steps)
+
         with tqdm.tqdm(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
@@ -181,6 +185,7 @@ class CatVTONPipeline:
                     and (i + 1) % self.noise_scheduler.order == 0
                 ):
                     progress_bar.update()
+                    self.pbar.update(1)
 
         # Decode the final latents
         latents = latents.split(latents.shape[concat_dim] // 2, dim=concat_dim)[0]
