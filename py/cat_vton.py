@@ -35,7 +35,7 @@ class LS_CatVTON:
     def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg):
 
         device = "cuda"
-        catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
+        catvton_path = os.path.join(folder_paths.models_dir,"checkpoints", "CatVTON")
         sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
 
         mixed_precision = {
