@@ -4,7 +4,9 @@ CatVTON warpper for ComfyUI. fixed the cropping issue of images with different p
 
 Original repo: [https://github.com/Zheng-Chong/CatVTON](https://github.com/Zheng-Chong/CatVTON)    
 
-![image](workflow/workflow.png)     
+It is recommend use 6G or higher VRAM NVidia GPU device to run.
+
+![image](workflow/catvton_example.jpg)     
 
 ### Install Plugin
 Open the cmd window in the plugin directory of ComfyUI, like ComfyUI\custom_nodes，type:
@@ -24,7 +26,7 @@ For Aki ComfyUI package, type:
 ..\..\python\python.exe -s -m pip install -r requirements.txt
 ```
 ### Download Models
-Download all model files from [BaiduNetdisk](https://pan.baidu.com/s/1QuIgWF8EnISCnovku9nZ1g?pwd=y0n0 ) or [GoogleDrive](https://drive.google.com/drive/folders/1TJNNql7UfDPVgHJuItDDjowycN5jpC5o?usp=sharing) and copy to ```ComtyUI/models/CatVTON``` directory. 
+Download all model files from [BaiduNetdisk](https://pan.baidu.com/s/1xbL5evB6iiav3QozsL0fJQ?pwd=06nv) or [GoogleDrive](https://drive.google.com/drive/folders/1TJNNql7UfDPVgHJuItDDjowycN5jpC5o?usp=sharing) and copy to ```ComtyUI/models/CatVTON``` directory. 
 
 ### Example Workflow
 The example workflow files is in the workflow directory.
