@@ -1,9 +1,14 @@
-
-
 from .func import *
 from comfy.utils import ProgressBar
+from comfy.model_management import get_torch_device
+from controlnet_flux import FluxControlNetModel
+from transformer_flux import FluxTransformer2DModel
+from pipeline_flux_controlnet_inpaint import FluxControlNetInpaintingPipeline
+from .catvton.cloth_masker import AutoMasker, vis_mask
 
 NODE_NAME = 'CatVTON_Wrapper'
+t_device = get_torch_device()
+DEVICE = t_device.type
 
 class LS_CatVTON:
 
@@ -16,7 +21,7 @@ class LS_CatVTON:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "mask": ("MASK",),
+                # "mask": ("MASK",),
                 "refer_image": ("IMAGE",),
                 "mask_grow": ("INT", {"default": 25, "min": -999, "max": 999, "step": 1}),
                 "mixed_precision": (["fp32", "fp16", "bf16"], {"default": "fp16"}),
@@ -24,6 +29,9 @@ class LS_CatVTON:
                 "steps": ("INT", {"default": 40, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 14.0, "step": 0.1, "round": 0.01,},),
                 # "device": (device_list,),
+            },
+            "optional": {
+                "mask": ("MASK",),
             }
         }
 
@@ -32,26 +40,54 @@ class LS_CatVTON:
     FUNCTION = "catvton"
     CATEGORY = '😺dzNodes/CatVTON Wrapper'
 
-    def catvton(self, image, mask, refer_image, mask_grow, mixed_precision, seed, steps, cfg):
+    def catvton(self, image, refer_image, mask_grow, mixed_precision, seed, steps, cfg, mask=None):
 
-        device = "cuda"
+        # device = "cuda"
         catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
-        sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
-
+        # sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
+        # inpaint con flux 
         mixed_precision = {
             "fp32": torch.float32,
             "fp16": torch.float16,
             "bf16": torch.bfloat16,
         }[mixed_precision]
 
+        # Build pipeline
+        controlnet = FluxControlNetModel.from_pretrained("alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Alpha", torch_dtype=mixed_precision, cache_dir=catvton_path )
+        transformer = FluxTransformer2DModel.from_pretrained("black-forest-labs/FLUX.1-dev", subfolder='transformer', torch_dtype=mixed_precision, cache_dir=catvton_path )
+        pipe = FluxControlNetInpaintingPipeline.from_pretrained(
+            "black-forest-labs/FLUX.1-dev",
+            controlnet=controlnet,
+            transformer=transformer,
+            torch_dtype=mixed_precision,
+            cache_dir=catvton_path
+        ).to(DEVICE)
+        pipe.transformer.to(mixed_precision)
+        pipe.controlnet.to(torch.mixed_precision)
+
+        # TODO - add lora realism + Turbo 
+
         pipeline = CatVTONPipeline(
-            base_ckpt=sd15_inpaint_path,
+            base_ckpt=pipe,
             attn_ckpt=catvton_path,
             attn_ckpt_version="mix",
             weight_dtype=mixed_precision,
             use_tf32=True,
-            device=device
+            device=DEVICE
         )
+
+        # AutoMasker
+        automasker = AutoMasker(
+            densepose_ckpt=os.path.join(catvton_path, "DensePose"),
+            schp_ckpt=os.path.join(catvton_path, "SCHP"),
+            device=DEVICE, 
+        )
+                
+        if mask is None:
+            mask = automasker(
+                image,
+                refer_image
+            )['mask']
 
         if mask.dim() == 2:
             mask = torch.unsqueeze(mask, 0)
@@ -66,7 +102,7 @@ class LS_CatVTON:
         mask_image = mask_image[0]
         mask_image = to_pil_image(mask_image)
 
-        generator = torch.Generator(device=device).manual_seed(seed)
+        generator = torch.Generator(device=DEVICE).manual_seed(seed)
         person_image, person_image_bbox = resize_and_padding_image(target_image, (768, 1024))
         cloth_image, _ = resize_and_padding_image(refer_image, (768, 1024))
         mask, _ = resize_and_padding_image(mask_image, (768, 1024))
