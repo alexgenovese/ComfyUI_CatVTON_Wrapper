@@ -20,6 +20,7 @@ from .catvton.pipeline import CatVTONPipeline
 from torchvision.transforms.functional import to_pil_image, to_tensor
 from diffusers.image_processor import VaeImageProcessor
 import folder_paths
+from .catvton.cloth_masker import AutoMasker, vis_mask
 
 def log(message:str, message_type:str='info'):
     name = 'LayerStyle'

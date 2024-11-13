@@ -1,17 +1,12 @@
-import inspect
-import os
+import inspect, os, torch, tqdm, os
 from typing import Union
 import PIL
-from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler
+from diffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, FlowMatchEulerDiscreteScheduler
 from diffusers.utils.torch_utils import randn_tensor
 
-import torch
-import tqdm
-import os
 import folder_paths
 from .attn_processor import SkipAttnProcessor
 from .utils import get_trainable_module, init_adapter
-
 from accelerate import load_checkpoint_in_model
 from huggingface_hub import snapshot_download
 from .utils1 import (
@@ -24,6 +19,13 @@ from .utils1 import (
     call_callback
 )
 from comfy.utils import ProgressBar
+
+from controlnet_flux import FluxControlNetModel
+from transformer_flux import FluxTransformer2DModel
+from pipeline_flux_controlnet_inpaint import FluxControlNetInpaintingPipeline
+from comfy.model_management import get_torch_device
+t_device = get_torch_device()
+DEVICE = t_device.type
 
 class CatVTONPipeline:
     def __init__(
@@ -38,10 +40,27 @@ class CatVTONPipeline:
     ):
         self.device = device
         self.weight_dtype = weight_dtype
-        # TODO change scheduler for flux
-        self.noise_scheduler = DDIMScheduler.from_pretrained(base_ckpt, subfolder="scheduler")
-        # TODO add Flux VAE
-        # self.vae = AutoencoderKL.from_pretrained(os.path.join(folder_paths.models_dir, "checkpoints", "CatVTON", "sd-vae-ft-mse")).to(device, dtype=weight_dtype)
+
+        # Build pipeline
+        catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
+        controlnet_path = os.path.join(folder_paths.models_dir, "controlnet", "_FLUX" )
+
+        controlnet = FluxControlNetModel.from_pretrained("alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Alpha", torch_dtype=weight_dtype, cache_dir=controlnet_path )
+        transformer = FluxTransformer2DModel.from_pretrained("black-forest-labs/FLUX.1-dev", subfolder='transformer', torch_dtype=weight_dtype, cache_dir=base_ckpt )
+        pipe = FluxControlNetInpaintingPipeline.from_pretrained(
+            "black-forest-labs/FLUX.1-dev",
+            controlnet=controlnet,
+            transformer=transformer,
+            torch_dtype=weight_dtype,
+            cache_dir=catvton_path
+        ).to(DEVICE)
+        pipe.transformer.to(weight_dtype)
+        pipe.controlnet.to(torch.weight_dtype)
+        pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+
+        self.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(base_ckpt, subfolder="scheduler", torch_dtype=weight_dtype)
+        # sd15_vae_folder = os.path.join(folder_paths.models_dir, "checkpoints", "CatVTON", "sd-vae-ft-mse")
+        self.vae = AutoencoderKL.from_pretrained(base_ckpt).to(device, dtype=weight_dtype)
         self.unet = UNet2DConditionModel.from_pretrained(base_ckpt, subfolder="unet").to(device, dtype=weight_dtype)
         init_adapter(self.unet, cross_attn_cls=SkipAttnProcessor)  # Skip Cross-Attention
         self.attn_modules = get_trainable_module(self.unet, "attention")

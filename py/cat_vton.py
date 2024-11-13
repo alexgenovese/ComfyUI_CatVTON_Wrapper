@@ -1,10 +1,6 @@
 from .func import *
 from comfy.utils import ProgressBar
 from comfy.model_management import get_torch_device
-from controlnet_flux import FluxControlNetModel
-from transformer_flux import FluxTransformer2DModel
-from pipeline_flux_controlnet_inpaint import FluxControlNetInpaintingPipeline
-from .catvton.cloth_masker import AutoMasker, vis_mask
 
 NODE_NAME = 'CatVTON_Wrapper'
 t_device = get_torch_device()
@@ -42,8 +38,12 @@ class LS_CatVTON:
 
     def catvton(self, image, refer_image, mask_grow, mixed_precision, seed, steps, cfg, mask=None):
 
+        # Check if exists weights 
+        # download_weights()
+
         # device = "cuda"
         catvton_path = os.path.join(folder_paths.models_dir, "CatVTON")
+        flux_path = os.path.join(folder_paths.models_dir, "checkpoints", "FLUX")
         # sd15_inpaint_path = os.path.join(catvton_path, "stable-diffusion-inpainting")
         # inpaint con flux 
         mixed_precision = {
@@ -51,24 +51,9 @@ class LS_CatVTON:
             "fp16": torch.float16,
             "bf16": torch.bfloat16,
         }[mixed_precision]
-
-        # Build pipeline
-        controlnet = FluxControlNetModel.from_pretrained("alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Alpha", torch_dtype=mixed_precision, cache_dir=catvton_path )
-        transformer = FluxTransformer2DModel.from_pretrained("black-forest-labs/FLUX.1-dev", subfolder='transformer', torch_dtype=mixed_precision, cache_dir=catvton_path )
-        pipe = FluxControlNetInpaintingPipeline.from_pretrained(
-            "black-forest-labs/FLUX.1-dev",
-            controlnet=controlnet,
-            transformer=transformer,
-            torch_dtype=mixed_precision,
-            cache_dir=catvton_path
-        ).to(DEVICE)
-        pipe.transformer.to(mixed_precision)
-        pipe.controlnet.to(torch.mixed_precision)
-
-        # TODO - add lora realism + Turbo 
-
+        
         pipeline = CatVTONPipeline(
-            base_ckpt=pipe,
+            base_ckpt=flux_path,
             attn_ckpt=catvton_path,
             attn_ckpt_version="mix",
             weight_dtype=mixed_precision,
