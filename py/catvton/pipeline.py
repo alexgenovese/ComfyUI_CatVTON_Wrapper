@@ -56,7 +56,11 @@ class CatVTONPipeline:
         ).to(DEVICE)
         pipe.transformer.to(weight_dtype)
         pipe.controlnet.to(torch.weight_dtype)
+
+        ## OPTIMIZATION 
         pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+        pipe.vae.enable_slicing()
+        pipe.vae.enable_tiling()
 
         self.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(base_ckpt, subfolder="scheduler", torch_dtype=weight_dtype)
         # sd15_vae_folder = os.path.join(folder_paths.models_dir, "checkpoints", "CatVTON", "sd-vae-ft-mse")
